@@ -1,0 +1,371 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no" />
+<title>ScratchPad — Mobile DJ Wheel</title>
+<style>
+  :root{
+    --bg:#0c0f14;
+    --panel:#121620;
+    --accent:#27e1ae;
+    --muted:#778;
+    --text:#e9eef7;
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+  html,body{height:100%;margin:0;background:linear-gradient(180deg,#0b0f14,#0a0d12);color:var(--text);font-family:system-ui,-apple-system,Segoe UI,Roboto,Inter,Arial,sans-serif;}
+  header{padding:16px 18px 0;display:flex;align-items:center;justify-content:space-between;gap:12px;}
+  h1{font-size:18px;margin:0;font-weight:700;letter-spacing:.2px;}
+  .sub{font-size:12px;color:var(--muted)}
+  .container{padding:12px 18px 24px;display:grid;gap:14px}
+  .card{background:var(--panel);border:1px solid rgba(255,255,255,.06);border-radius:16px;padding:14px}
+  .row{display:flex;gap:12px;align-items:center;flex-wrap:wrap}
+  input[type=file]{
+    width:100%;padding:10px 12px;background:#0e1219;border:1px dashed rgba(255,255,255,.12);
+    border-radius:10px;color:var(--text);font-size:14px;
+  }
+  button, .btn{
+    appearance:none;border:0;border-radius:12px;background:#18202d;color:var(--text);
+    padding:12px 14px;font-weight:700;font-size:15px;letter-spacing:.3px;
+  }
+  button:active{transform:translateY(1px)}
+  .btn-accent{background:linear-gradient(180deg,#1ee2b4,#18caa3)}
+  .btn-ghost{background:#0e141d;border:1px solid rgba(255,255,255,.08)}
+  .label{font-size:12px;color:var(--muted);margin-bottom:8px}
+  .wheel-wrap{display:grid;place-items:center;padding:6px}
+  .wheel{
+    --size:min(80vw,440px);
+    width:var(--size); height:var(--size);
+    border-radius:50%;
+    background:
+      radial-gradient( circle at 50% 50%, #1b2433 0 36%, #101521 36% 40%, #0c111a 40% 41%, transparent 41%) ,
+      conic-gradient(from 0deg at 50% 50%,
+        rgba(255,255,255,.12) 0 2%, transparent 2% 8%,
+        rgba(255,255,255,.07) 8% 9%, transparent 9% 15%) ;
+    box-shadow: 0 10px 30px rgba(0,0,0,.45), inset 0 0 40px rgba(0,0,0,.5);
+    position:relative;
+    touch-action:none;
+    user-select:none;
+  }
+  .strobe{
+    position:absolute; inset:10% 10%;
+    border-radius:50%; pointer-events:none;
+    box-shadow: inset 0 0 0 2px rgba(255,255,255,.06), inset 0 0 12px rgba(39,225,174,.25);
+  }
+  .label-dot{
+    position:absolute; width:14px; height:14px; border-radius:50%;
+    background:var(--accent); top:4%; left:50%; transform:translateX(-50%);
+    box-shadow:0 0 14px rgba(39,225,174,.65);
+  }
+  .marker{
+    position:absolute; width:2px; height:16%; background:var(--accent);
+    top:2%; left:50%; transform:translateX(-50%); opacity:.9;
+    box-shadow:0 0 14px rgba(39,225,174,.6);
+  }
+  .center{
+    position:absolute; width:22%; height:22%; border-radius:50%;
+    top:39%; left:39%; background:#0b0f16; border:2px solid rgba(255,255,255,.1);
+    box-shadow:inset 0 0 30px rgba(0,0,0,.7);
+  }
+  .readout{display:flex;justify-content:space-between;font-variant-numeric:tabular-nums;border-top:1px solid rgba(255,255,255,.06); margin-top:10px; padding-top:10px; color:#cfe6de}
+  .slider{appearance:none;width:100%;height:8px;background:#0c121a;border-radius:999px;outline:none}
+  .slider::-webkit-slider-thumb{appearance:none;width:22px;height:22px;border-radius:50%;background:var(--accent);box-shadow:0 0 10px rgba(39,225,174,.6)}
+  .grid-2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+  .muted{color:#a8b3c7;font-size:12px}
+  .tiny{font-size:11px;color:#9aabc2}
+  .foot{padding:8px 18px 20px;color:#94a3b8;font-size:12px;text-align:center}
+  .fader-wrap{display:flex;align-items:center;gap:10px}
+  .fader{appearance:none;width:100%;height:14px;background:#0c121a;border-radius:999px;outline:none}
+  .fader::-webkit-slider-thumb{appearance:none;width:26px;height:26px;border-radius:8px;background:#eaeef6;box-shadow:0 2px 8px rgba(0,0,0,.4)}
+  .toggle{display:inline-flex;align-items:center;gap:8px}
+  .toggle input{width:42px;height:24px;appearance:none;background:#0f1520;border-radius:999px;position:relative;outline:none;border:1px solid rgba(255,255,255,.08)}
+  .toggle input:checked{background:#153c33;border-color:#1ad4a6}
+  .toggle input::after{content:"";position:absolute;inset:3px; width:18px;height:18px;border-radius:50%;background:#dfe7ef; transition:transform .18s ease}
+  .toggle input:checked::after{transform:translateX(18px)}
+</style>
+</head>
+<body>
+  <header>
+    <div>
+      <h1>ScratchPad</h1>
+      <div class="sub">Touch the vinyl to scratch. Works offline, on phone.</div>
+    </div>
+    <button id="playPause" class="btn btn-accent">Play</button>
+  </header>
+
+  <div class="container">
+    <div class="card">
+      <div class="label">Load a track (MP3/WAV/AAC/OGG)</div>
+      <input id="file" type="file" accept="audio/*" />
+      <div class="tiny" style="margin-top:6px">Tip: use a short drum loop or vocal for easier scratching.</div>
+    </div>
+
+    <div class="card wheel-wrap">
+      <div id="wheel" class="wheel" aria-label="Vinyl platter">
+        <div class="strobe"></div>
+        <div class="marker"></div>
+        <div class="label-dot"></div>
+        <div class="center"></div>
+      </div>
+      <div class="readout">
+        <div>BPM: <span id="bpm">--</span></div>
+        <div>Pos: <span id="pos">0.0</span>s</div>
+        <div>Rate: <span id="rate">1.00</span>x</div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="row">
+        <div class="grid-2" style="flex:1">
+          <button id="cue" class="btn-ghost">Set/Return CUE</button>
+          <button id="back" class="btn-ghost">Back 1s</button>
+        </div>
+        <div class="grid-2" style="flex:1">
+          <button id="fwd" class="btn-ghost">Forward 1s</button>
+          <button id="cut" class="btn">Transform CUT</button>
+        </div>
+      </div>
+      <div style="height:10px"></div>
+      <div class="row">
+        <div style="flex:2">
+          <div class="label">Scratch sensitivity</div>
+          <input id="sens" type="range" min="0.002" max="0.04" step="0.001" value="0.014" class="slider" />
+          <div class="muted tiny">Higher = more movement per finger travel</div>
+        </div>
+        <div style="flex:1">
+          <label class="toggle">
+            <input id="slip" type="checkbox" checked>
+            <span>Slip mode</span>
+          </label>
+          <div class="tiny muted">Keep the beat rolling under your hand</div>
+        </div>
+      </div>
+      <div style="height:8px"></div>
+      <div class="row">
+        <div style="flex:1">
+          <div class="label">Volume</div>
+          <input id="vol" type="range" min="0" max="1" step="0.01" value="0.9" class="fader" />
+        </div>
+        <div style="width:110px;text-align:right">
+          <div class="label">Cut (hold)</div>
+          <div class="tiny muted">Silences output for sharp scratches</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="foot">Made for touch + mouse. No sign‑in, no server. Drop this file on your phone and open in browser.</div>
+
+<script>
+(()=>{
+  const fileInput = document.getElementById('file');
+  const wheel = document.getElementById('wheel');
+  const playBtn = document.getElementById('playPause');
+  const backBtn = document.getElementById('back');
+  const fwdBtn = document.getElementById('fwd');
+  const cueBtn = document.getElementById('cue');
+  const cutBtn = document.getElementById('cut');
+  const sens = document.getElementById('sens');
+  const slip = document.getElementById('slip');
+  const vol = document.getElementById('vol');
+  const bpmEl = document.getElementById('bpm');
+  const posEl = document.getElementById('pos');
+  const rateEl = document.getElementById('rate');
+
+  let audio = new Audio();
+  audio.crossOrigin = "anonymous";
+  audio.preload = 'auto';
+  audio.loop = true;
+
+  // Audio context for smoother volume + potential FX later
+  const ctx = new (window.AudioContext || window.webkitAudioContext)();
+  const src = ctx.createMediaElementSource(audio);
+  const gain = ctx.createGain();
+  src.connect(gain).connect(ctx.destination);
+
+  let isLoaded = false;
+  let wasPlaying = false;
+  let cuePoint = 0;
+  let slipTimer = null;
+  let slipRefTime = 0;
+  let slipRefAudioTime = 0;
+  let isCut = false;
+
+  function fmt(n){ return (Math.round(n*100)/100).toFixed(2); }
+
+  function updateReadout(){
+    posEl.textContent = (audio.currentTime || 0).toFixed(1);
+    rateEl.textContent = fmt(audio.playbackRate || 1);
+  }
+  setInterval(updateReadout, 120);
+
+  vol.addEventListener('input', ()=>{
+    gain.gain.value = isCut ? 0 : parseFloat(vol.value);
+  });
+
+  // Transform cut button (hold to mute)
+  const startCut = ()=>{ isCut = true; gain.gain.value = 0; navigator.vibrate?.(8); }
+  const endCut = ()=>{ isCut = false; gain.gain.value = parseFloat(vol.value); }
+  cutBtn.addEventListener('pointerdown', startCut);
+  cutBtn.addEventListener('pointerup', endCut);
+  cutBtn.addEventListener('pointerleave', endCut);
+  cutBtn.addEventListener('touchstart', e=>{e.preventDefault(); startCut();}, {passive:false});
+  cutBtn.addEventListener('touchend', endCut);
+
+  // Load local file
+  fileInput.addEventListener('change', (e)=>{
+    const file = e.target.files?.[0];
+    if(!file) return;
+    const url = URL.createObjectURL(file);
+    audio.src = url;
+    audio.playbackRate = 1;
+    audio.currentTime = 0;
+    audio.onloadedmetadata = ()=>{
+      isLoaded = true;
+      bpmEl.textContent = estimateBPM(file.name) || '--';
+      playBtn.textContent = 'Play';
+      navigator.vibrate?.(10);
+    };
+  });
+
+  // Try a rough-and-ready BPM estimate only from filename like "120bpm", purely cosmetic
+  function estimateBPM(name){
+    const m = (name||'').toLowerCase().match(/(\d{2,3})\s*bpm/);
+    return m ? m[1] : null;
+  }
+
+  // Play/Pause
+  playBtn.addEventListener('click', async ()=>{
+    if(!isLoaded){ fileInput.click(); return; }
+    await ctx.resume();
+    if(audio.paused){ audio.play(); playBtn.textContent='Pause'; }
+    else{ audio.pause(); playBtn.textContent='Play'; }
+  });
+
+  backBtn.addEventListener('click', ()=>{
+    audio.currentTime = Math.max(0, audio.currentTime - 1);
+  });
+  fwdBtn.addEventListener('click', ()=>{
+    audio.currentTime = Math.min(audio.duration-0.01, audio.currentTime + 1);
+  });
+
+  cueBtn.addEventListener('click', ()=>{
+    if(Math.abs(audio.currentTime - cuePoint) < 0.1){
+      audio.currentTime = cuePoint;
+      navigator.vibrate?.(6);
+    }else{
+      cuePoint = audio.currentTime;
+      cueBtn.textContent = 'Return CUE';
+      navigator.vibrate?.(12);
+    }
+  });
+
+  // --- SCRATCH ENGINE (scrub-by-angle) ---
+  let dragging = false;
+  let startAngle = 0;
+  let lastAngle = 0;
+  let lastTime = 0;
+
+  const getAngle = (x,y,rect)=>{
+    const cx = rect.left + rect.width/2;
+    const cy = rect.top + rect.height/2 + window.scrollY;
+    const dx = x - cx;
+    const dy = y - cy;
+    return Math.atan2(dy, dx); // radians
+  };
+
+  const onDragStart = (clientX, clientY)=>{
+    if(!isLoaded) return;
+    dragging = true;
+    wasPlaying = !audio.paused;
+    if(slip.checked){
+      // Remember the "under-the-hood" timeline
+      slipRefTime = performance.now();
+      slipRefAudioTime = audio.currentTime;
+    }else{
+      audio.pause();
+    }
+    const rect = wheel.getBoundingClientRect();
+    startAngle = getAngle(clientX, clientY, rect);
+    lastAngle = startAngle;
+    lastTime = performance.now();
+    wheel.style.transition = 'none';
+    wheel.style.animation = 'none';
+    wheel.classList.add('active');
+    navigator.vibrate?.(8);
+  };
+
+  const onDragMove = (clientX, clientY)=>{
+    if(!dragging) return;
+    const rect = wheel.getBoundingClientRect();
+    const ang = getAngle(clientX, clientY, rect);
+    let delta = ang - lastAngle;
+    // unwrap
+    if(delta > Math.PI) delta -= Math.TAU || (Math.PI*2);
+    if(delta < -Math.PI) delta += Math.TAU || (Math.PI*2);
+
+    // Convert angle delta to time movement
+    const sensitivity = parseFloat(sens.value); // seconds per radian
+    audio.currentTime = clamp(audio.currentTime + delta * (sensitivity * 57.2958/57.2958), 0, Math.max(0,audio.duration-0.02));
+
+    // Visual rotate marker for feedback
+    wheel.style.transform = `rotate(${audio.currentTime * 120}deg)`; // purely cosmetic
+
+    // Update rough "rate" readout
+    const now = performance.now();
+    const dt = (now - lastTime)/1000;
+    const speed = (delta/dt); // radians per sec
+    const fakeRate = clamp(speed * sensitivity / 1.0, -6, 6);
+    rateEl.textContent = (fakeRate>=0?'+':'') + fmt(fakeRate);
+    lastAngle = ang;
+    lastTime = now;
+  };
+
+  const onDragEnd = ()=>{
+    if(!dragging) return;
+    dragging = false;
+    wheel.classList.remove('active');
+    // Slip mode: jump ahead to where the track would have been
+    if(slip.checked){
+      const elapsed = (performance.now() - slipRefTime)/1000;
+      const target = slipRefAudioTime + elapsed;
+      // If we scratched near the current underlying time, don't jump too hard
+      const diff = target - audio.currentTime;
+      if(Math.abs(diff) > 0.08){
+        audio.currentTime = clamp(target, 0, Math.max(0,audio.duration-0.02));
+      }
+    }else if(wasPlaying){
+      audio.play().catch(()=>{});
+    }
+    // settle readout
+    rateEl.textContent = fmt(1.0);
+    if(navigator.vibrate){ navigator.vibrate(6); }
+  };
+
+  const clamp = (v,min,max)=>Math.min(Math.max(v,min),max);
+
+  // Pointer events (mouse + touch)
+  wheel.addEventListener('pointerdown', e=>{
+    wheel.setPointerCapture(e.pointerId);
+    onDragStart(e.clientX, e.clientY);
+  });
+  wheel.addEventListener('pointermove', e=>{
+    if(dragging) onDragMove(e.clientX, e.clientY);
+  });
+  wheel.addEventListener('pointerup', e=>{
+    onDragEnd();
+  });
+  wheel.addEventListener('pointercancel', onDragEnd);
+
+  // Keep readout in sync
+  audio.addEventListener('timeupdate', ()=>{
+    posEl.textContent = (audio.currentTime || 0).toFixed(1);
+  });
+
+  // Unlock audio on first user interaction (iOS)
+  window.addEventListener('touchstart', ()=>ctx.resume(), {once:true});
+  window.addEventListener('pointerdown', ()=>ctx.resume(), {once:true});
+})();
+</script>
+</body>
+</html>
